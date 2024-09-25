@@ -1,0 +1,62 @@
+CREATE TABLE table1 (
+    id VARCHAR2(10),
+    key11 VARCHAR2(10),
+    key22 VARCHAR2(10),
+    key33 VARCHAR2(10)
+);
+
+INSERT INTO table1 (id, key11, key22, key33) VALUES ('id1', 'key1', 'key2', NULL);
+INSERT INTO table1 (id, key11, key22, key33) VALUES ('id2', 'key3', 'key4', NULL);
+INSERT INTO table1 (id, key11, key22, key33) VALUES ('id3', 'key5', 'key5', 'key6');
+
+
+select t1.* 
+from table1 t1;
+
+
+CREATE TABLE table2 (
+    key VARCHAR2(10),
+    data1 VARCHAR2(10),
+    data2 VARCHAR2(10)
+);
+
+INSERT INTO table2 (key, data1, data2) VALUES ('key1', 'data1', 'data2');
+INSERT INTO table2 (key, data1, data2) VALUES ('key2', 'data3', 'data4');
+INSERT INTO table2 (key, data1, data2) VALUES ('key3', 'data5', 'data6');
+INSERT INTO table2 (key, data1, data2) VALUES ('key4', 'data7', 'data8');
+INSERT INTO table2 (key, data1, data2) VALUES ('key5', 'data9', 'data10');
+INSERT INTO table2 (key, data1, data2) VALUES ('key6', 'data11', 'data12');
+
+
+select * from table2;
+
+
+SELECT *
+from table1 t1
+UNPIVOT (keys FOR col IN (key11, key22, key33)) unpvt
+JOIN table2 t2 ON unpvt.keys = t2.key;
+
+
+-- SELECT unpvt.id, unpvt.col, unpvt.key, t2.data1, t2.data2
+-- from table1 t1
+-- UNPIVOT (key FOR col IN (key11, key22, key33)) unpvt
+-- JOIN table2 t2 ON unpvt.key = t2.key;
+
+
+
+select *
+from (
+  SELECT unpvt.id, unpvt.col, unpvt.key, t2.data1, t2.data2
+  from table1 t1
+  UNPIVOT (key FOR col IN (key11, key22, key33)) unpvt
+  JOIN table2 t2 ON unpvt.key = t2.key
+)
+PIVOT (
+    max(key) as key,
+    max(data1) as data1,
+    max(data2) as data2
+    FOR col IN ('KEY11' AS let1, 'KEY22' AS let2, 'KEY33' AS let3, 'KEY44' AS let4)
+);
+
+
+
