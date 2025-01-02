@@ -7,7 +7,7 @@ IS
     v_result          VARCHAR2(4000);       -- Результат функції
     v_full_role       VARCHAR2(4000);       -- Повне значення static_role_id з таблиці
     v_prefix          VARCHAR2(4000);       -- Префікс, визначений з p_static_role_id
-    v_separator       VARCHAR2(1);          -- Розділювач, визначений з p_static_role_id
+    v_separator       VARCHAR2(50);         -- Розділювач, визначений з p_static_role_id
     v_cleaned_role    VARCHAR2(4000);       -- Частина static_role_id після розділювача
     v_delimiter_pos   NUMBER;               -- Позиція першого розділювача
     v_default_separator CONSTANT VARCHAR2(1) := '_'; -- Дефолтний розділювач
@@ -55,3 +55,54 @@ BEGIN
     
 END get_static_role;
 /
+
+
+<===================================================================================================================================>
+
+-- Реалізація функції get_full_static_role_id
+FUNCTION get_full_static_role_id(
+    app_id IN VARCHAR2,      -- ідентифікатор додатку
+    user_name IN VARCHAR2,   -- ім'я користувача
+    static_role_id IN VARCHAR2 -- роль користувача (з префіксом або без)
+) RETURN VARCHAR2 
+IS
+    v_full_static_role_id VARCHAR2(4000);    -- змінна для збереження повного значення ролі
+    v_prefix VARCHAR2(4000);                   -- змінна для збереження префіксу
+    v_separator VARCHAR2(50) := '_';            -- дефолтний розділювач (використовується, якщо не вказано інше)
+    v_remaining_part VARCHAR2(4000);           -- частина після розділювача
+BEGIN
+    -- Спочатку намагаємося виділити префікс та розділювач із статичної ролі
+    -- Визначаємо префікс (знаходимо символи до першого розділювача або дефолтного)
+    v_prefix := REGEXP_SUBSTR(static_role_id, '^[a-zA-Z0-9]+', 1, 1);
+
+    -- Визначаємо розділювач (перевіряємо, чи є символи, що не є буквами або цифрами)
+    v_separator := REGEXP_SUBSTR(static_role_id, '[^a-zA-Z0-9]', 1, 1);
+
+    -- Тепер шукаємо повну роль у таблиці за заданими параметрами
+    -- Для цього використовуємо LIKE з екрануванням розділювача
+    SELECT static_role_id
+    INTO v_full_static_role_id
+    FROM your_table -- Замініть на свою таблицю
+    WHERE app_id = app_id           -- шукаємо за app_id
+      AND user_name = user_name     -- шукаємо за user_name
+      AND static_role_id LIKE v_prefix || '\' || NVL(v_separator, '_') || '%' ESCAPE '\'; -- формуємо шаблон для пошуку
+
+    -- Повертаємо повне значення static_role_id
+    RETURN v_full_static_role_id;
+
+EXCEPTION
+    -- Якщо жоден запис не знайдено, повертаємо NULL
+    WHEN NO_DATA_FOUND THEN
+        RETURN NULL;
+    -- Якщо виникає інша помилка, передаємо її далі
+    WHEN OTHERS THEN
+        RAISE;
+END get_full_static_role_id;
+
+
+
+
+
+
+
+
