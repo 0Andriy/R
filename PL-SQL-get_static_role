@@ -101,6 +101,68 @@ END get_full_static_role_id;
 
 
 
+<======================================================================================================>
+
+
+CREATE OR REPLACE FUNCTION check_and_get_user_role(
+    p_app_id       IN VARCHAR2,      -- ID програми
+    p_user_name    IN VARCHAR2,      -- Ім'я користувача
+    p_role_input   IN VARCHAR2       -- Повна роль або роль з префіксом
+) 
+RETURN VARCHAR2
+IS
+    v_role_count   INTEGER;          -- Лічильник знайдених ролей
+    v_role         VARCHAR2(4000);   -- Змінна для збереження знайденої ролі
+    v_prefix       VARCHAR2(100);    -- Префікс ролі
+    v_suffix       VARCHAR2(4000);   -- Частина після розділювача
+    v_separator    VARCHAR2(1) := '-'; -- Дефолтний розділювач (можна змінити за потребою)
+BEGIN
+    -- Шукаємо префікс (букви або цифри на початку)
+    v_prefix := REGEXP_SUBSTR(p_role_input, '^[a-zA-Z0-9_-]+'); -- Беремо префікс з початку рядка
+
+    IF v_prefix IS NOT NULL THEN
+        -- Якщо префікс знайдений, шукаємо роль, що починається з цього префікса
+        SELECT static_role_id
+        INTO v_role
+        FROM roles_table -- таблиця з ролями
+        WHERE app_id = p_app_id
+          AND user_name = p_user_name
+          AND static_role_id LIKE v_prefix || '%'
+        FETCH FIRST 1 ROWS ONLY; -- Лише перший знайдений результат
+        
+        -- Якщо розділювач присутній, повертаємо частину після нього
+        IF v_role IS NOT NULL AND INSTR(v_role, v_separator) > 0 THEN
+            v_suffix := SUBSTR(v_role, INSTR(v_role, v_separator) + 1);
+            RETURN v_suffix;
+        ELSE
+            -- Якщо розділювача немає, повертаємо роль як є
+            RETURN v_role;
+        END IF;
+    ELSE
+        -- Якщо префікс не знайдений, шукаємо точну роль
+        SELECT static_role_id
+        INTO v_role
+        FROM roles_table
+        WHERE app_id = p_app_id
+          AND user_name = p_user_name
+          AND static_role_id = p_role_input
+        FETCH FIRST 1 ROWS ONLY; -- Тільки перший знайдений результат
+        IF v_role IS NOT NULL THEN
+            -- Повертаємо точну роль, якщо знайдена
+            RETURN v_role;
+        ELSE
+            -- Якщо нічого не знайдено, повертаємо NULL
+            RETURN NULL;
+        END IF;
+    END IF;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        -- Якщо роль не знайдена, повертаємо NULL
+        RETURN NULL;
+    WHEN OTHERS THEN
+        -- Обробка інших помилок
+        RETURN NULL;
+END check_and_get_user_role;
 
 
 
