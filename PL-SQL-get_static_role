@@ -1,0 +1,57 @@
+CREATE OR REPLACE FUNCTION get_static_role(
+    p_app_id IN VARCHAR2,           -- Вхідний параметр: ID програми
+    p_user_name IN VARCHAR2,        -- Вхідний параметр: ім'я користувача
+    p_static_role_id IN VARCHAR2    -- Вхідний параметр: значення static_role_id (може містити префікс і розділювач)
+) RETURN VARCHAR2
+IS
+    v_result          VARCHAR2(4000);       -- Результат функції
+    v_full_role       VARCHAR2(4000);       -- Повне значення static_role_id з таблиці
+    v_prefix          VARCHAR2(4000);       -- Префікс, визначений з p_static_role_id
+    v_separator       VARCHAR2(1);          -- Розділювач, визначений з p_static_role_id
+    v_cleaned_role    VARCHAR2(4000);       -- Частина static_role_id після розділювача
+    v_delimiter_pos   NUMBER;               -- Позиція першого розділювача
+    v_default_separator CONSTANT VARCHAR2(1) := '_'; -- Дефолтний розділювач
+BEGIN
+    -- Знайти першу позицію розділювача (будь-який символ, що не літера або цифра)
+    v_delimiter_pos := REGEXP_INSTR(p_static_role_id, '[^a-zA-Z0-9]', 1, 1);
+
+
+    IF v_delimiter_pos > 0 THEN
+        -- Якщо розділювач знайдено, виділити префікс і розділювач
+        v_prefix := SUBSTR(p_static_role_id, 1, v_delimiter_pos - 1);
+        v_separator := SUBSTR(p_static_role_id, v_delimiter_pos, 1);
+    ELSE
+        -- Якщо розділювач не знайдено, використовувати весь рядок як префікс і дефолтний розділювач
+        v_prefix := p_static_role_id;
+        v_separator := v_default_separator;
+    END IF;
+
+
+    BEGIN
+        -- Спроба знайти повне значення static_role_id у таблиці
+        SELECT static_role_id
+        INTO v_full_role
+        FROM (
+            SELECT static_role_id
+            FROM your_table                      -- Змінити на вашу таблицю
+            WHERE app_id = p_app_id              -- Умови для пошуку
+              AND user_name = p_user_name
+              AND static_role_id LIKE v_prefix || '\' || v_separator || '%' ESCAPE '\' -- Шаблон для пошуку
+              AND ROWNUM = 1                     -- Вибрати лише перший запис
+        );
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            -- Якщо нічого не знайдено, повернути NULL
+            RETURN NULL;
+    END;
+
+
+    -- Виділити частину після розділювача
+    v_cleaned_role := SUBSTR(v_full_role, INSTR(v_full_role, v_separator) + 1);
+
+
+    -- Повернути результат
+    RETURN v_cleaned_role;
+    
+END get_static_role;
+/
