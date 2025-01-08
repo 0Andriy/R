@@ -1,0 +1,28 @@
+DECLARE
+  l_json_array JSON_ARRAY_T; -- Масив JSON
+  l_json_object JSON_OBJECT_T; -- Об'єкт JSON
+  l_employee_data JSON_OBJECT_T; -- Об'єкт для кожного запису
+  i NUMBER;
+BEGIN
+  -- Ініціалізуємо JSON-масив
+  l_json_array := JSON_ARRAY_T();
+
+  -- Наповнюємо масив значеннями у циклі
+  FOR i IN 1..5 LOOP
+    -- Створюємо об'єкт для кожного елемента
+    l_employee_data := JSON_OBJECT_T();
+    l_employee_data.PUT('id', i);
+    l_employee_data.PUT('name', 'Employee ' || i);
+    
+    -- Додаємо об'єкт до масиву
+    l_json_array.APPEND(l_employee_data);
+  END LOOP;
+
+  -- Створюємо фінальний JSON-об'єкт
+  l_json_object := JSON_OBJECT_T();
+  l_json_object.PUT('employees', l_json_array);
+
+  -- Виводимо результат
+  DBMS_OUTPUT.PUT_LINE(l_json_object.TO_CLOB());
+END;
+/
