@@ -61,3 +61,84 @@ SELECT
     role_name AS role_at_task_time    -- Роль користувача на момент виконання
 FROM task_roles
 ORDER BY completed_at;                -- Сортуємо за часом виконання
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+WITH 
+user_roles AS (
+    SELECT 1 AS id, 1 AS user_id, 'Менеджер' AS role_name, 
+           TO_TIMESTAMP('2025-01-01 09:00:00', 'YYYY-MM-DD HH24:MI:SS') AS assigned_at 
+    FROM DUAL
+    UNION ALL
+    SELECT 2, 1, 'Оператор', 
+           TO_TIMESTAMP('2025-01-02 12:00:00', 'YYYY-MM-DD HH24:MI:SS') 
+    FROM DUAL
+    UNION ALL
+    SELECT 3, 2, 'Аналітик', 
+           TO_TIMESTAMP('2025-01-01 08:00:00', 'YYYY-MM-DD HH24:MI:SS') 
+    FROM DUAL
+),
+tasks_combined AS (
+    SELECT 1 AS id, 1 AS user_id, 'Виконав звіт' AS description, 
+           TO_TIMESTAMP('2025-01-01 10:00:00', 'YYYY-MM-DD HH24:MI:SS') AS completed_at,
+           'tasks' AS source_data
+    FROM DUAL
+    UNION ALL
+    SELECT 2, 1, 'Перевірив дані', 
+           TO_TIMESTAMP('2025-01-02 13:00:00', 'YYYY-MM-DD HH24:MI:SS'),
+           'tasks' AS source_data
+    FROM DUAL
+    UNION ALL
+    SELECT 3, 2, 'Підготував презентацію', 
+           TO_TIMESTAMP('2025-01-01 09:30:00', 'YYYY-MM-DD HH24:MI:SS'),
+           'tasks' AS source_data
+    FROM DUAL
+    UNION ALL
+    SELECT 4 AS id, 2 AS user_id, 'Перевірив звіт' AS description, 
+           TO_TIMESTAMP('2025-01-01 11:00:00', 'YYYY-MM-DD HH24:MI:SS'),
+           'tasks2' AS source_data
+    FROM DUAL
+),
+task_roles AS (
+    SELECT 
+        t.id AS task_id,
+        t.user_id,
+        t.description,
+        t.completed_at,
+        t.source_data,
+        ur.role_name,
+        ur.assigned_at,
+        ROW_NUMBER() OVER (
+            PARTITION BY t.source_data, t.id -- Групуємо за джерелом і ID завдання
+            ORDER BY ur.assigned_at DESC     -- Остання роль до завершення завдання
+        ) AS rnk
+    FROM tasks_combined t
+    LEFT JOIN user_roles ur
+        ON ur.user_id = t.user_id
+       AND ur.assigned_at <= t.completed_at
+)
+SELECT 
+    task_id,
+    user_id,
+    description,
+    completed_at,
+    source_data,
+    role_name AS role_at_task_time
+FROM task_roles
+WHERE rnk = 1 -- Вибираємо тільки найпізнішу роль
+ORDER BY source_data, task_id; -- Сортування за джерелом та ID
