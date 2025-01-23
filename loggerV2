@@ -1,0 +1,112 @@
+import winston from 'winston' // Логер
+import 'winston-daily-rotate-file'
+import path from 'path' // Робота з шляхами
+import config from '../config/config.js'
+
+import { fileURLToPath } from 'url'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+// https://betterstack.com/community/guides/logging/how-to-install-setup-and-use-winston-and-morgan-to-log-node-js-applications/
+// Визначаємо рівні логування
+// error має найвищий пріоритет (0), а silly — найнижчий (6).
+// Логи нижчого рівня, ніж поточний, ігноруються.
+const logLevels = {
+    error: 0,
+    warn: 1,
+    info: 2,
+    http: 3,
+    verbose: 4,
+    debug: 5,
+    silly: 6,
+}
+
+// Спільний формат логів
+const getLogFormat = () =>
+    winston.format.combine(
+        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }), // Мітка часу в форматі ISO 8601
+        winston.format.errors({ stack: true }), // Логування помилок зі стеком
+        winston.format.printf(({ timestamp, level, message, logMetadata, stack, ...meta }) => {
+            return `${timestamp} [${level}]: ${logMetadata || ''} ${message} ${stack ? `\n${stack}` : ''} \n${
+                Object.keys(meta).length ? JSON.stringify(meta, null, 2) : ''
+            }\n\n`
+        }),
+        // winston.format.printf(({ timestamp, level, message, stack, ...meta }) => {
+        //     // Формуємо JSON-об'єкт для виводу
+        //     const logEntry = {
+        //         timestamp,
+        //         level,
+        //         message,
+        //         ...(stack && { stack }), // Додаємо стек, якщо він є
+        //         ...(Object.keys(meta).length > 0 && { meta }), // Додаємо метадані, якщо вони є
+        //     }
+        //     // Повертаємо JSON у красивому форматі
+        //     return JSON.stringify(logEntry, null, 2)
+        // }),
+        // winston.format.printf(({ timestamp, level, message, ...meta }) => {
+        //     return `${timestamp} [${level}]: ${message} \n${
+        //         Object.keys(meta).length ? JSON.stringify(meta, null, 2) : ''
+        //     }`
+        // }),
+    )
+
+// Кастомний JSON формат
+const getCustomJsonFormat = () =>
+    winston.format.combine(winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }), winston.format.json())
+
+// Фільтр для певного рівня
+const createLevelFilter = (level) => winston.format((info) => (info.level === level ? info : false))()
+
+// Динамічний транспорт - це канали, куди записуються логи (наприклад, консоль або файли
+const createTransport = (options) => {
+    const { level, filename, format, filter } = options
+    return new winston.transports.DailyRotateFile({
+        level, // Рівень логування
+        filename: path.join(__dirname, filename), // Шлях до файлу
+        datePattern: 'YYYY-MM-DD', // Щоденне розбиття логів
+        zippedArchive: true, // Архівувати старі логи
+        maxSize: '20m', // Максимальний розмір файлу
+        maxFiles: '14d', // Максимальний термін зберігання логів
+        format: filter ? winston.format.combine(filter, format) : format, // Фільтруємо логи за рівнем
+    })
+}
+
+// Створюємо логер
+const logger = winston.createLogger({
+    levels: logLevels,
+    level: config.loggerLevel, // Рівень логування
+    format: getLogFormat(),
+    defaultMeta: {
+        service: 'admin-service', // Назва сервісу, яку ви хочете додавати до кожного логу
+    },
+    transports: [
+        // Транспорт для консолі
+        new winston.transports.Console({
+            format: winston.format.combine(
+                winston.format.colorize({ all: true }), // Додає кольори залежно від рівня логування
+                winston.format.align(), // Вирівнює логи
+                winston.format.prettyPrint(), // Виводить об'єкти в красивому форматі
+                getLogFormat(),
+            ),
+            handleExceptions: true, // Обробляє винятки
+        }),
+        // Транспорт для всіх логів
+        createTransport({
+            filename: '../../logs/combined/combined-%DATE%.log',
+            format: getCustomJsonFormat(),
+        }),
+        // Транспорт для помилок
+        createTransport({
+            level: 'error',
+            filename: '../../logs/errors/error-%DATE%.log',
+            format: getCustomJsonFormat(),
+            filter: createLevelFilter('error'),
+        }),
+    ],
+    exitOnError: false, // Не виходити через необроблені помилки
+})
+
+// // Створення дочірнього логера для іншого сервісу
+// const userLogger = logger.child({ service: 'user-service' })
+
+export default logger
